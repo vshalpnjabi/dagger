@@ -1,0 +1,7 @@
+kind: Fixed
+body: |
+  dagger.toml `ignore` patterns are applied when loading a workspace and when `Workspace.findRoots` walks for project markers, so a nested `go.mod` under an ignored directory such as `.delta` is no longer discovered.
+time: 2026-11-01T00:45:00Z
+custom:
+  Author: vshalpnjabi
+  PR: ""

@@ -1030,11 +1030,18 @@ func (s *workspaceSchema) resolveRootfs(
 	filter core.CopyFilter,
 	gitignore bool,
 ) (dagql.ObjectResult[*core.Directory], error) {
+	isRoot := resolvedPath == "." || resolvedPath == "/" || resolvedPath == ""
+	if isRoot {
+		ignore, err := workspaceConfigIgnore(ctx, ws)
+		if err != nil {
+			return dagql.ObjectResult[*core.Directory]{}, err
+		}
+		filter = withWorkspaceIgnore(filter, ignore)
+	}
 	inst, err := s.resolveRootfsInner(ctx, ws, resolvedPath, filter, gitignore)
 	if err != nil {
 		return inst, err
 	}
-	isRoot := resolvedPath == "." || resolvedPath == "/" || resolvedPath == ""
 	if ws.HostPath() != "" && isRoot && inst.Self() != nil {
 		srv, err := core.CurrentDagqlServer(ctx)
 		if err != nil {
@@ -4378,6 +4385,10 @@ func (s *workspaceSchema) findRoots(
 	if err != nil {
 		return nil, err
 	}
+	ignore, err := workspaceConfigIgnore(ctx, parent.Self())
+	if err != nil {
+		return nil, err
+	}
 
 	var dirs []string
 	seen := map[string]bool{}
@@ -4396,12 +4407,18 @@ func (s *workspaceSchema) findRoots(
 		add(ancestor)
 	}
 
-	descendants, err := s.descendantRoots(ctx, parent, start, args.Markers, args.Exclude)
+	exclude := append(append([]string{}, args.Exclude...), workspaceIgnoreExcludePatterns(ignore)...)
+	descendants, err := s.descendantRoots(ctx, parent, start, args.Markers, exclude)
 	if err != nil {
 		return nil, err
 	}
 	for _, dir := range descendants {
 		add(dir)
+	}
+
+	dirs, err = filterIgnoredWorkspaceDirs(dirs, parent.Self().Cwd, ignore)
+	if err != nil {
+		return nil, err
 	}
 
 	return dagql.NewStringArray(dirs...), nil
