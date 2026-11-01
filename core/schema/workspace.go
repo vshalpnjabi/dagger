@@ -4416,11 +4416,6 @@ func (s *workspaceSchema) findRoots(
 		add(dir)
 	}
 
-	dirs, err = filterIgnoredWorkspaceDirs(dirs, parent.Self().Cwd, ignore)
-	if err != nil {
-		return nil, err
-	}
-
 	return dagql.NewStringArray(dirs...), nil
 }
 

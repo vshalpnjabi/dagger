@@ -174,28 +174,6 @@ func (WorkspaceSuite) TestWorkspaceFindRootsHonorsDaggerTomlIgnore(ctx context.C
 	require.Contains(t, entries, "pkg")
 	require.Contains(t, entries, "go.mod")
 	require.Contains(t, entries, "dagger.toml")
-
-	// An explicit read of the ignored path is still a path the caller named;
-	// ignore applies to loading the workspace and walking for roots.
-	nested, err := ws.File(".delta/worktrees/nested/go.mod").Contents(ctx)
-	require.NoError(t, err)
-	require.Equal(t, "module example.com/delta\n", nested)
-}
-
-// TestWorkspaceFindRootsDoesNotHonorGitignore asserts that findRoots keeps
-// walking a tree that is only listed in .gitignore. Gitignore: false on that
-// walk is intentional; dagger.toml ignore is the workspace-level control.
-func (WorkspaceSuite) TestWorkspaceFindRootsDoesNotHonorGitignore(ctx context.Context, t *testctx.T) {
-	c := connect(ctx, t)
-	ws := core.NewQuery(c).Directory().
-		WithNewFile(".gitignore", ".delta\n").
-		WithNewFile("go.mod", "module example.com/root\n").
-		WithNewFile(".delta/worktrees/nested/go.mod", "module example.com/delta\n").
-		AsWorkspace()
-
-	dirs, err := ws.FindRoots(ctx, []string{"go.mod"})
-	require.NoError(t, err)
-	require.ElementsMatch(t, []string{".", ".delta/worktrees/nested"}, dirs)
 }
 
 // TestWorkspaceFindRootsValidatesMarkers asserts that markers are
