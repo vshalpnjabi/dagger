@@ -1,13 +1,16 @@
 package workspace
 
 import (
+	"path"
 	"path/filepath"
 	"strings"
 )
 
 // IgnorePatterns resolves dagger.toml ignore values relative to the directory
-// holding configFile. Patterns that escape the workspace root are dropped.
-// Missing or empty input yields nil.
+// holding configFile. A leading slash is treated as workspace-root-relative
+// (the config directory), not an absolute host path. Patterns that escape the
+// workspace with `..` are dropped. A pattern of `.` is dropped so it cannot
+// exclude the whole workspace. Missing or empty input yields nil.
 func IgnorePatterns(configFile string, ignore []string) []string {
 	if len(ignore) == 0 {
 		return nil
@@ -24,7 +27,8 @@ func IgnorePatterns(configFile string, ignore []string) []string {
 		}
 		clean, negative := strings.CutPrefix(pattern, "!")
 		clean = strings.TrimSpace(clean)
-		if clean == "" {
+		clean = path.Clean(strings.TrimLeft(filepath.ToSlash(clean), "/"))
+		if clean == "" || clean == "." {
 			continue
 		}
 		fromSlash := filepath.FromSlash(clean)
@@ -32,6 +36,9 @@ func IgnorePatterns(configFile string, ignore []string) []string {
 			continue
 		}
 		resolved := filepath.ToSlash(filepath.Clean(filepath.Join(configDir, fromSlash)))
+		if resolved == "." || !filepath.IsLocal(filepath.FromSlash(resolved)) {
+			continue
+		}
 		if negative {
 			resolved = "!" + resolved
 		}

@@ -707,7 +707,11 @@ func syntheticWorkspaceFromDirectory(
 	}
 	ws.SetRootfs(root)
 	ws.SetSource(core.NewWorkspaceSourceDirectory(root))
-	ws.SetIgnorePatterns(loadWorkspaceIgnorePatterns(ctx, root, detected.ConfigFile))
+	ignore, err := loadWorkspaceIgnorePatterns(ctx, root, detected.ConfigFile)
+	if err != nil {
+		return dagql.ObjectResult[*core.Workspace]{}, err
+	}
+	ws.SetIgnorePatterns(ignore)
 	return dagql.NewObjectResultForCurrentCall(ctx, srv, ws)
 }
 
@@ -748,7 +752,11 @@ func syntheticWorkspaceFromGitRef(
 	}
 	ws.SetRootfs(rootResult)
 	ws.SetSource(core.NewWorkspaceSourceGitRef(ref.Result))
-	ws.SetIgnorePatterns(loadWorkspaceIgnorePatterns(ctx, rootResult, detected.ConfigFile))
+	ignore, err := loadWorkspaceIgnorePatterns(ctx, rootResult, detected.ConfigFile)
+	if err != nil {
+		return dagql.ObjectResult[*core.Workspace]{}, err
+	}
+	ws.SetIgnorePatterns(ignore)
 	return dagql.NewObjectResultForCurrentCall(ctx, srv, ws)
 }
 

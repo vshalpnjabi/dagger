@@ -285,8 +285,10 @@ func (WorkspaceSuite) TestWorkspaceFindRootsIgnoreMalformedConfig(ctx context.Co
 	require.Contains(t, entries, ".delta/")
 }
 
-// TestWorkspaceFindRootsIgnoreRemovedConfig asserts Directory still works
-// when ConfigFile is set but the file has been removed from the overlay.
+// TestWorkspaceFindRootsIgnoreRemovedConfig asserts user-facing reads do
+// not fail when ConfigFile is still set but dagger.toml has been removed
+// from the overlay. Ignore is snapshotted at load, so this does not
+// require the overlay to re-parse config.
 func (WorkspaceSuite) TestWorkspaceFindRootsIgnoreRemovedConfig(ctx context.Context, t *testctx.T) {
 	c := connect(ctx, t)
 	ws := ignoreWorkspaceSource(c, "ignore = [\".delta\"]\n").AsWorkspace().WithoutFile("dagger.toml")
@@ -294,12 +296,44 @@ func (WorkspaceSuite) TestWorkspaceFindRootsIgnoreRemovedConfig(ctx context.Cont
 	entries, err := ws.Directory(".").Entries(ctx)
 	require.NoError(t, err)
 	require.Contains(t, entries, "go.mod")
+
+	dirs, err := ws.FindRoots(ctx, []string{"go.mod"})
+	require.NoError(t, err)
+	require.NotEmpty(t, dirs)
+}
+
+// TestWorkspaceFindRootsIgnoreDot asserts ignore = ["."] is dropped so it
+// cannot exclude the whole workspace.
+func (WorkspaceSuite) TestWorkspaceFindRootsIgnoreDot(ctx context.Context, t *testctx.T) {
+	c := connect(ctx, t)
+	ws := ignoreWorkspaceSource(c, "ignore = [\".\"]\n").AsWorkspace()
+
+	dirs, err := ws.FindRoots(ctx, []string{"go.mod"})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{".", "pkg", "pkg/.delta/nested", "pkg/vendor", ".delta/worktrees/nested"}, dirs)
+
+	entries := requireWorkspaceRootEntries(ctx, t, ws)
+	require.Contains(t, entries, ".delta/")
+}
+
+// TestWorkspaceFindRootsIgnoreAbsPath asserts a leading-slash pattern is
+// workspace-relative, not a host absolute path.
+func (WorkspaceSuite) TestWorkspaceFindRootsIgnoreAbsPath(ctx context.Context, t *testctx.T) {
+	c := connect(ctx, t)
+	ws := ignoreWorkspaceSource(c, "ignore = [\"/.delta\"]\n").AsWorkspace()
+
+	dirs, err := ws.FindRoots(ctx, []string{"go.mod"})
+	require.NoError(t, err)
+	require.ElementsMatch(t, []string{".", "pkg", "pkg/.delta/nested", "pkg/vendor"}, dirs)
+
+	entries := requireWorkspaceRootEntries(ctx, t, ws)
 	require.NotContains(t, entries, ".delta/")
 }
 
-// TestWorkspaceFindRootsIgnoreGitInclude asserts a value workspace with a
-// git [[include]] does not re-enter resolveRootfs to load ignore, and still
-// applies the local ignore list.
+// TestWorkspaceFindRootsIgnoreGitInclude is a smoke test that a value
+// workspace with a git [[include]] does not re-enter resolveRootfs to load
+// ignore. Included-config ignore is intentionally not applied; only the
+// local ignore list is.
 func (WorkspaceSuite) TestWorkspaceFindRootsIgnoreGitInclude(ctx context.Context, t *testctx.T) {
 	c := connect(ctx, t)
 	ws := ignoreWorkspaceSource(c, "ignore = [\".delta\"]\n\n[[include]]\nsource = \"https://127.0.0.1:1/does-not-exist.git#:dagger.toml\"\n").AsWorkspace()
