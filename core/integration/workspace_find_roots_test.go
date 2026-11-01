@@ -171,7 +171,8 @@ func (WorkspaceSuite) TestWorkspaceFindRootsHonorsDaggerTomlIgnore(ctx context.C
 	entries, err := ws.Directory(".").Entries(ctx)
 	require.NoError(t, err)
 	require.NotContains(t, entries, ".delta")
-	require.Contains(t, entries, "pkg")
+	require.NotContains(t, entries, ".delta/")
+	require.Contains(t, entries, "pkg/")
 	require.Contains(t, entries, "go.mod")
 	require.Contains(t, entries, "dagger.toml")
 }
